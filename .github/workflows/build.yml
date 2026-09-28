@@ -1,0 +1,164 @@
+name: Build WSLg Custom Image
+
+# 手动触发：可指定 WSLg 基线版本、weston 版本，并选择是否发布到 Releases
+on:
+  workflow_dispatch:
+    inputs:
+      wslg_ref:
+        description: 'WSLg 版本（tag 或分支，如 v1.0.79）'
+        required: true
+        default: 'v1.0.79'
+      weston_ref:
+        description: 'weston 分支或 commit（默认取 working 分支最新）'
+        required: false
+        default: 'working'
+      publish_release:
+        description: '构建成功后发布到 Releases'
+        type: boolean
+        required: false
+        default: true
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+
+    steps:
+      - name: 释放磁盘空间
+        uses: jlumbroso/free-disk-space@main
+        with:
+          tool-cache: true
+          android: true
+          dotnet: true
+          haskell: true
+          large-packages: true
+          docker-images: false
+          swap-storage: true
+
+      - name: 检出本仓库（提供 weston 补丁）
+        uses: actions/checkout@v4
+        with:
+          path: repo
+
+      - name: 安装 Go（tar2ext4 由构建脚本通过 go run 拉取）
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+          cache: false
+
+      - name: 克隆 WSLg 与各组件源码
+        env:
+          WSLG_REF: ${{ inputs.wslg_ref }}
+          WESTON_REF: ${{ inputs.weston_ref }}
+        run: |
+          set -euo pipefail
+          echo "WSLg ref   : $WSLG_REF"
+          echo "weston ref : $WESTON_REF"
+
+          git clone --branch "$WSLG_REF" --depth 1 https://github.com/microsoft/wslg.git wslg
+          cd wslg
+
+          # 保留完整历史：git apply --3way 需要原始 blob 才能做三方合并
+          git clone -b working https://github.com/microsoft/weston-mirror     vendor/weston
+          git clone -b working https://github.com/microsoft/FreeRDP-mirror    vendor/FreeRDP
+          git clone -b working https://github.com/microsoft/PulseAudio-mirror vendor/pulseaudio
+          git clone -b v1.608.0 https://github.com/microsoft/DirectX-Headers.git vendor/DirectX-Headers-1.0
+          git clone -b mesa-23.1.0 https://gitlab.freedesktop.org/mesa/mesa.git vendor/mesa
+
+          git -C vendor/weston checkout "$WESTON_REF" 2>/dev/null || echo "weston 已位于 $WESTON_REF"
+
+          echo "=== 实际使用的各组件版本 ==="
+          for d in weston FreeRDP pulseaudio mesa DirectX-Headers-1.0; do
+            printf '%-24s %s\n' "$d" "$(git -C "vendor/$d" rev-parse HEAD)"
+          done
+
+      - name: 应用 weston 白边修复补丁
+        run: |
+          set -euo pipefail
+          cd wslg/vendor/weston
+          git config user.email "ci@wslg.local"
+          git config user.name "wslg-ci"
+          PATCH="$GITHUB_WORKSPACE/repo/patch-files/weston/base-2318feca.patch"
+
+          if ! git apply --3way --whitespace=nowarn "$PATCH"; then
+            echo "::error::补丁应用失败，冲突文件："
+            git diff --name-only --diff-filter=U || true
+            exit 1
+          fi
+          echo "补丁应用成功"
+
+          echo "=== 校验补丁特征（防止静默失败）==="
+          grep -q "FRAME_FLAG_BORDERLESS" shared/frame.c || { echo "::error::frame.c 未包含补丁改动"; exit 1; }
+          grep -q "toggle_borderless"      xwayland/window-manager.c || { echo "::error::window-manager.c 未包含补丁改动"; exit 1; }
+          echo "白边修复代码已就位"
+
+      - name: 构建 system distro 镜像
+        run: |
+          set -euo pipefail
+          cd wslg
+          chmod +x build-and-export.sh devops/get-nuget-version.sh 2>/dev/null || true
+          bash build-and-export.sh
+
+      - name: 记录产物信息
+        run: |
+          ls -lh wslg/system_x64.vhd
+          sha256sum wslg/system_x64.vhd | tee wslg/SHA256SUMS.txt
+
+      - name: 上传构建产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: wslg-system-x64-vhd
+          path: |
+            wslg/system_x64.vhd
+            wslg/SHA256SUMS.txt
+          retention-days: 7
+
+      - name: 发布到 Releases
+        if: ${{ inputs.publish_release }}
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: wslg-${{ inputs.wslg_ref }}-custom.${{ github.run_number }}
+          name: WSLg ${{ inputs.wslg_ref }} 定制版（白边修复）
+          files: |
+            wslg/system_x64.vhd
+            wslg/SHA256SUMS.txt
+          draft: false
+          body: |
+            ## WSLg ${{ inputs.wslg_ref }} 定制构建
+
+            | 项目 | 值 |
+            | --- | --- |
+            | WSLg 基线 | `microsoft/wslg` @ `${{ inputs.wslg_ref }}` |
+            | weston 版本 | `${{ inputs.weston_ref }}` |
+            | 应用补丁 | `patch-files/weston/base-2318feca.patch` |
+            | 构建流水线 | run #${{ github.run_number }} |
+
+            ### 补丁内容
+            - 消除 X11 窗口左、下、右三处的白色边框
+            - `Alt+F11` 窗口化 / 最大化切换
+            - `Alt+F12` 标题栏模式 / 无边框模式切换
+            - `Alt+左键拖动` 调整窗口大小
+            - `Alt+右键拖动` 移动窗口
+            - 支持从 Windows 剪贴板粘贴图片
+            - 点击左上角标题栏图标切换浅色 / 深色
+
+            ### 使用方法
+            1. 下载 `system_x64.vhd` 到本地，例如 `C:\wslg\system_x64.vhd`
+            2. 编辑 `%UserProfile%\.wslconfig`，在 `[wsl2]` 节中加一行：
+
+               ```ini
+               [wsl2]
+               systemDistro=C:\\wslg\\system_x64.vhd
+               ```
+
+            3. 执行 `wsl --shutdown`，之后启动任意 WSL 发行版即生效
+            4. 验证：`cat /mnt/wslg/versions.txt`
+
+            ### 回滚
+            删除 `.wslconfig` 里的 `systemDistro` 行，再执行 `wsl --shutdown`。
+
+            ---
+            > 本镜像由 GitHub Actions 自动构建，未经过人工测试，使用前请自行评估。
