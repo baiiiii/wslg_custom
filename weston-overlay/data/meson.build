@@ -1,0 +1,45 @@
+install_data(
+	[
+		'background.png',
+		'border.png',
+		'fullscreen.png',
+		'home.png',
+		'icon_editor.png',
+		'icon_flower.png',
+		'icon_ivi_clickdot.png',
+		'icon_ivi_flower.png',
+		'icon_ivi_simple-egl.png',
+		'icon_ivi_simple-shm.png',
+		'icon_ivi_smoke.png',
+		'icon_terminal.png',
+		'icon_window.png',
+		'panel.png',
+		'pattern.png',
+		'random.png',
+		'sidebyside.png',
+		'sign_close.png',
+		'sign_maximize.png',
+		'sign_minimize.png',
+		'terminal.png',
+		'tiling.png',
+		'wayland.png',
+		'wayland.svg',
+	],
+	install_dir: join_paths(dir_data, 'weston')
+)
+
+install_data(
+	[
+		'custom_icon/close_black.png',
+		'custom_icon/close_white.png',
+		'custom_icon/maximize_black.png',
+		'custom_icon/maximize_white.png',
+		'custom_icon/minimize_black.png',
+		'custom_icon/minimize_white.png',
+		'custom_icon/revert_black.png',
+		'custom_icon/revert_white.png',
+		'custom_icon/window_black.png',
+		'custom_icon/window_white.png',
+	],
+	install_dir: join_paths(dir_data, 'weston', 'custom_icon')
+)
