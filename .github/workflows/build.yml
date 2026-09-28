@@ -11,8 +11,12 @@ name: Build WSLg v1.0.79 Custom Image
 
 on:
   workflow_dispatch:
+  # 仅当补丁变化时自动构建；workflow 自身或其他文件的改动不触发，
+  # 避免出现"改了文档也跑一遍全量 Docker 构建"的浪费
   push:
     branches: [v1.0.79]
+    paths:
+      - 'patch-files/**'
 
 env:
   WSLG_TAG: v1.0.79
