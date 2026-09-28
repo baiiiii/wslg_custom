@@ -9,9 +9,9 @@ on:
         required: true
         default: 'v1.0.79'
       weston_ref:
-        description: 'weston 分支或 commit（默认取 working 分支最新）'
+        description: 'weston commit 或分支。v1.0.79 官方配套为 a7e35fda；补丁基线为 2318feca'
         required: false
-        default: 'working'
+        default: 'a7e35fdab455dce5774b43b8aff682f748307e31'
       publish_release:
         description: '构建成功后发布到 Releases'
         type: boolean
@@ -61,14 +61,18 @@ jobs:
           git clone --branch "$WSLG_REF" --depth 1 https://github.com/microsoft/wslg.git wslg
           cd wslg
 
-          # 保留完整历史：git apply --3way 需要原始 blob 才能做三方合并
-          git clone -b working https://github.com/microsoft/weston-mirror     vendor/weston
-          git clone -b working https://github.com/microsoft/FreeRDP-mirror    vendor/FreeRDP
-          git clone -b working https://github.com/microsoft/PulseAudio-mirror vendor/pulseaudio
-          git clone -b v1.608.0 https://github.com/microsoft/DirectX-Headers.git vendor/DirectX-Headers-1.0
-          git clone -b mesa-23.1.0 https://gitlab.freedesktop.org/mesa/mesa.git vendor/mesa
+          # 组件版本锁定为 WSLg v1.0.79 官方配套版本
+          # 来源：v1.0.79 运行环境的 /mnt/wslg/versions.txt
+          # weston 不指定 -b 以保留完整历史：git apply --3way 需要原始 blob 做三方合并
+          git clone https://github.com/microsoft/weston-mirror      vendor/weston
+          git clone https://github.com/microsoft/FreeRDP-mirror     vendor/FreeRDP
+          git clone https://github.com/microsoft/PulseAudio-mirror  vendor/pulseaudio
+          git clone -b v1.608.0    https://github.com/microsoft/DirectX-Headers.git vendor/DirectX-Headers-1.0
+          git clone -b mesa-23.1.0 https://gitlab.freedesktop.org/mesa/mesa.git     vendor/mesa
 
-          git -C vendor/weston checkout "$WESTON_REF" 2>/dev/null || echo "weston 已位于 $WESTON_REF"
+          git -C vendor/weston     checkout "$WESTON_REF"
+          git -C vendor/FreeRDP    checkout c4030980b29322a9cb2190711a5fadeeeb8b6a33
+          git -C vendor/pulseaudio checkout c33051f2296af748ac5cd13e51abfac4d129e4c7
 
           echo "=== 实际使用的各组件版本 ==="
           for d in weston FreeRDP pulseaudio mesa DirectX-Headers-1.0; do
