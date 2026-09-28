@@ -5,14 +5,9 @@ Subject: [PATCH] 大文本粘贴优化
 修复 Electron/VSCode 等 X11 无装饰窗口最大化后窗口位置偏移的 bug
 增强 WSLg X11/Xwayland 应用窗口的功能： - X11 窗口默认启动时显示 Weston 自绘顶部标题栏。 - 自绘装饰仅保留顶部标题栏，左、右、下边框和阴影均为 0。 - `Alt+F12` 在“仅顶部标题栏模式”和“完全无边框模式”之间切换。 - `Alt+F11` 在窗口化和最大化之间切换。 - `Alt+鼠标左键` 调整窗口大小。 - `Alt+鼠标右键` 移动窗口。 - 点击标题栏左上角窗口图标切换当前窗口深色/浅色主题。 - 标题栏按钮使用 `vendor/weston/data/custom_icon` 下的 PNG 图标。 - 右侧最小化、最大化、关闭按钮不绘制白色矩形背景，只保留 PNG 图标和透明点击区域。 - Xwayland RAIL 窗口使用无 Windows 原生 caption/thickframe 的 RAIL style，以避免 Windows 侧白边和原生边框。
 ---
-Index: data/meson.build
-IDEA additional info:
-Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
-<+>UTF-8
-===================================================================
 diff --git a/data/meson.build b/data/meson.build
---- a/data/meson.build	(revision 2318fecaeac1f1a2d5a7a042c34d931c71dae04c)
-+++ b/data/meson.build	(revision 0aa75528f893a7520ad70e0319c92a54d0146471)
+--- a/data/meson.build
++++ b/data/meson.build
 @@ -27,3 +27,19 @@
  	],
  	install_dir: join_paths(dir_data, 'weston')
@@ -33,14 +28,9 @@ diff --git a/data/meson.build b/data/meson.build
 +	],
 +	install_dir: join_paths(dir_data, 'weston', 'custom_icon')
 +)
-Index: include/libweston/xwayland-api.h
-IDEA additional info:
-Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
-<+>UTF-8
-===================================================================
 diff --git a/include/libweston/xwayland-api.h b/include/libweston/xwayland-api.h
---- a/include/libweston/xwayland-api.h	(revision 2318fecaeac1f1a2d5a7a042c34d931c71dae04c)
-+++ b/include/libweston/xwayland-api.h	(revision 0aa75528f893a7520ad70e0319c92a54d0146471)
+--- a/include/libweston/xwayland-api.h
++++ b/include/libweston/xwayland-api.h
 @@ -30,6 +30,7 @@
  extern "C" {
  #endif
@@ -75,14 +65,9 @@ diff --git a/include/libweston/xwayland-api.h b/include/libweston/xwayland-api.h
  };
  
  /** Retrieve the API object for the libweston Xwayland surface.
-Index: libweston/backend-rdp/rdprail.c
-IDEA additional info:
-Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
-<+>UTF-8
-===================================================================
 diff --git a/libweston/backend-rdp/rdprail.c b/libweston/backend-rdp/rdprail.c
---- a/libweston/backend-rdp/rdprail.c	(revision 2318fecaeac1f1a2d5a7a042c34d931c71dae04c)
-+++ b/libweston/backend-rdp/rdprail.c	(revision 0aa75528f893a7520ad70e0319c92a54d0146471)
+--- a/libweston/backend-rdp/rdprail.c
++++ b/libweston/backend-rdp/rdprail.c
 @@ -46,6 +46,7 @@
  
  #include "libweston-internal.h"
@@ -145,14 +130,9 @@ diff --git a/libweston/backend-rdp/rdprail.c b/libweston/backend-rdp/rdprail.c
  				window_state_order.extendedStyle = WS_EX_LAYERED;
  				/* force update window geometry */
  				rail_state->forceUpdateWindowState = true;
-Index: rdprail-shell/shell.c
-IDEA additional info:
-Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
-<+>UTF-8
-===================================================================
 diff --git a/rdprail-shell/shell.c b/rdprail-shell/shell.c
---- a/rdprail-shell/shell.c	(revision 2318fecaeac1f1a2d5a7a042c34d931c71dae04c)
-+++ b/rdprail-shell/shell.c	(revision 0aa75528f893a7520ad70e0319c92a54d0146471)
+--- a/rdprail-shell/shell.c
++++ b/rdprail-shell/shell.c
 @@ -49,6 +49,7 @@
  #include <libweston/libweston.h>
  #include <libweston/backend.h>
@@ -326,14 +306,9 @@ diff --git a/rdprail-shell/shell.c b/rdprail-shell/shell.c
  	weston_compositor_add_button_binding(ec, BTN_LEFT,
  					     mod | MODIFIER_SHIFT,
  					     resize_binding, shell);
-Index: shared/cairo-util.c
-IDEA additional info:
-Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
-<+>UTF-8
-===================================================================
 diff --git a/shared/cairo-util.c b/shared/cairo-util.c
---- a/shared/cairo-util.c	(revision 2318fecaeac1f1a2d5a7a042c34d931c71dae04c)
-+++ b/shared/cairo-util.c	(revision 0aa75528f893a7520ad70e0319c92a54d0146471)
+--- a/shared/cairo-util.c
++++ b/shared/cairo-util.c
 @@ -496,12 +496,34 @@
  	cairo_surface_t *source;
  	int x, y, margin, top_margin;
@@ -435,14 +410,9 @@ diff --git a/shared/cairo-util.c b/shared/cairo-util.c
  	if (flags & THEME_FRAME_MAXIMIZED) {
  		margin = 0;
  		grip_size = 0;
-Index: shared/cairo-util.h
-IDEA additional info:
-Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
-<+>UTF-8
-===================================================================
 diff --git a/shared/cairo-util.h b/shared/cairo-util.h
---- a/shared/cairo-util.h	(revision 2318fecaeac1f1a2d5a7a042c34d931c71dae04c)
-+++ b/shared/cairo-util.h	(revision 0aa75528f893a7520ad70e0319c92a54d0146471)
+--- a/shared/cairo-util.h
++++ b/shared/cairo-util.h
 @@ -27,6 +27,7 @@
  #define _CAIRO_UTIL_H
  
@@ -493,14 +463,9 @@ diff --git a/shared/cairo-util.h b/shared/cairo-util.h
  /* May set FRAME_STATUS_REPAINT */
  void
  frame_resize(struct frame *frame, int32_t width, int32_t height);
-Index: shared/frame.c
-IDEA additional info:
-Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
-<+>UTF-8
-===================================================================
 diff --git a/shared/frame.c b/shared/frame.c
---- a/shared/frame.c	(revision 2318fecaeac1f1a2d5a7a042c34d931c71dae04c)
-+++ b/shared/frame.c	(revision 0aa75528f893a7520ad70e0319c92a54d0146471)
+--- a/shared/frame.c
++++ b/shared/frame.c
 @@ -40,6 +40,15 @@
  	FRAME_BUTTON_ALIGN_RIGHT = 0x1,
  	FRAME_BUTTON_DECORATED = 0x2,
@@ -1030,14 +995,9 @@ diff --git a/shared/frame.c b/shared/frame.c
  
  	frame_status_clear(frame, FRAME_STATUS_REPAINT);
  }
-Index: xwayland/window-manager.c
-IDEA additional info:
-Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
-<+>UTF-8
-===================================================================
 diff --git a/xwayland/window-manager.c b/xwayland/window-manager.c
---- a/xwayland/window-manager.c	(revision 2318fecaeac1f1a2d5a7a042c34d931c71dae04c)
-+++ b/xwayland/window-manager.c	(revision 558019a01a393c42d8d6cff836e6aef26dc7c69b)
+--- a/xwayland/window-manager.c
++++ b/xwayland/window-manager.c
 @@ -733,6 +733,9 @@
  	} else if (window->decorate && window->frame) {
  		*width = frame_width(window->frame);
@@ -1215,14 +1175,9 @@ diff --git a/xwayland/window-manager.c b/xwayland/window-manager.c
 +	set_borderless,
 +	toggle_borderless,
  };
-Index: libweston/backend-rdp/rdpclip.c
-IDEA additional info:
-Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
-<+>UTF-8
-===================================================================
 diff --git a/libweston/backend-rdp/rdpclip.c b/libweston/backend-rdp/rdpclip.c
---- a/libweston/backend-rdp/rdpclip.c	(revision 70dadf68e07a9386f58a2188535504f737b8b98e)
-+++ b/libweston/backend-rdp/rdpclip.c	(revision 6320156bf1a62c85e3ede7b817b47cc276dad510)
+--- a/libweston/backend-rdp/rdpclip.c
++++ b/libweston/backend-rdp/rdpclip.c
 @@ -34,6 +34,7 @@
  #include <fcntl.h>
  #include <linux/input.h>
@@ -1790,14 +1745,9 @@ diff --git a/libweston/backend-rdp/rdpclip.c b/libweston/backend-rdp/rdpclip.c
  	if (index < 0) {
  		weston_log("Client: %s client requests data format the server never reported in format list response. protocol error.\n", __func__);
  		goto error_return;
-Index: libweston/backend-rdp/meson.build
-IDEA additional info:
-Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
-<+>UTF-8
-===================================================================
 diff --git a/libweston/backend-rdp/meson.build b/libweston/backend-rdp/meson.build
---- a/libweston/backend-rdp/meson.build	(revision 2fa6f3838882d6c483509fb7b0129e4048435d40)
-+++ b/libweston/backend-rdp/meson.build	(revision 558019a01a393c42d8d6cff836e6aef26dc7c69b)
+--- a/libweston/backend-rdp/meson.build
++++ b/libweston/backend-rdp/meson.build
 @@ -28,6 +28,8 @@
  	endif
  endif
@@ -1815,14 +1765,9 @@ diff --git a/libweston/backend-rdp/meson.build b/libweston/backend-rdp/meson.bui
  	dep_rdpapplist,
  ]
  
-Index: xwayland/selection.c
-IDEA additional info:
-Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
-<+>UTF-8
-===================================================================
 diff --git a/xwayland/selection.c b/xwayland/selection.c
---- a/xwayland/selection.c	(revision 2fa6f3838882d6c483509fb7b0129e4048435d40)
-+++ b/xwayland/selection.c	(revision 558019a01a393c42d8d6cff836e6aef26dc7c69b)
+--- a/xwayland/selection.c
++++ b/xwayland/selection.c
 @@ -340,17 +340,48 @@
  	xcb_flush(wm->conn);
  }
@@ -1901,14 +1846,9 @@ diff --git a/xwayland/selection.c b/xwayland/selection.c
  		weston_wm_send_selection_notify(wm, XCB_ATOM_NONE);
  	}
  }
-Index: xwayland/xwayland.h
-IDEA additional info:
-Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
-<+>UTF-8
-===================================================================
 diff --git a/xwayland/xwayland.h b/xwayland/xwayland.h
---- a/xwayland/xwayland.h	(revision 2fa6f3838882d6c483509fb7b0129e4048435d40)
-+++ b/xwayland/xwayland.h	(revision 558019a01a393c42d8d6cff836e6aef26dc7c69b)
+--- a/xwayland/xwayland.h
++++ b/xwayland/xwayland.h
 @@ -152,6 +152,8 @@
  		xcb_atom_t		 window;
  		xcb_atom_t		 text_plain_utf8;
