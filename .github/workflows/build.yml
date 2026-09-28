@@ -68,27 +68,23 @@ jobs:
             printf '%-24s %s\n' "$d" "$(git -C "vendor/$d" rev-parse HEAD)"
           done
 
-      - name: 应用 weston 白边修复补丁
+      - name: 应用白边修复改动（用仓库内的 overlay 文件覆盖）
         run: |
           set -euo pipefail
           cd wslg/vendor/weston
-          git config user.email "ci@wslg.local"
-          git config user.name "wslg-ci"
-          PATCH="$GITHUB_WORKSPACE/repo/patch-files/weston/base-2318feca.patch"
 
-          if ! git apply --3way --whitespace=nowarn "$PATCH"; then
-            echo "::error::补丁应用失败，冲突文件如下"
-            git diff --name-only --diff-filter=U || true
-            echo "--- 冲突片段 ---"
-            git diff | head -120
-            exit 1
-          fi
-          echo "补丁应用成功"
+          # 直接覆盖源码目录，不走 patch / git apply：
+          # 原补丁是 IDEA 格式且含 GIT binary patch 段，git apply 解析不了（已踩坑）。
+          cp -a "$GITHUB_WORKSPACE/repo/weston-overlay/." .
 
-          echo "=== 校验补丁特征（防止静默失败）==="
-          grep -q "FRAME_FLAG_BORDERLESS" shared/frame.c || { echo "::error::frame.c 未包含补丁改动"; exit 1; }
-          grep -q "toggle_borderless"      xwayland/window-manager.c || { echo "::error::window-manager.c 未包含补丁改动"; exit 1; }
-          echo "白边修复代码已就位"
+          echo "=== 校验改动已就位 ==="
+          grep -q "FRAME_FLAG_BORDERLESS" shared/frame.c \
+            || { echo "::error::frame.c 缺少修复代码"; exit 1; }
+          grep -q "toggle_borderless" xwayland/window-manager.c \
+            || { echo "::error::window-manager.c 缺少修复代码"; exit 1; }
+          ICONS=$(ls data/custom_icon/*.png 2>/dev/null | wc -l)
+          [ "$ICONS" -eq 10 ] || { echo "::error::图标文件数量为 $ICONS，应为 10"; exit 1; }
+          echo "改动已就位：12 个源文件 + $ICONS 个图标"
 
       - name: 构建 system distro 镜像
         run: |
