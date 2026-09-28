@@ -1,22 +1,26 @@
-name: Build WSLg Custom Image
+name: Build WSLg v1.0.79 Custom Image
 
-# 手动触发：可指定 WSLg 基线版本、weston 版本，并选择是否发布到 Releases
+# ═══════════════════════════════════════════════════════════════════
+# 本分支（v1.0.79）固定用于构建 WSLg v1.0.79 的定制镜像。
+# 所有组件版本锁定为 v1.0.79 的官方配套版本，来源：该版本运行环境的
+# /mnt/wslg/versions.txt —— 保证构建产物与目标版本严格对应。
+#
+# 要构建其他 WSLg 版本时：从 main 新建对应分支（如 v1.0.80），
+# 修改下方 env 中的各组件 ref，不要在 main 上直接改。
+# ═══════════════════════════════════════════════════════════════════
+
 on:
   workflow_dispatch:
-    inputs:
-      wslg_ref:
-        description: 'WSLg 版本（tag 或分支，如 v1.0.79）'
-        required: true
-        default: 'v1.0.79'
-      weston_ref:
-        description: 'weston commit 或分支。v1.0.79 官方配套为 a7e35fda；补丁基线为 2318feca'
-        required: false
-        default: 'a7e35fdab455dce5774b43b8aff682f748307e31'
-      publish_release:
-        description: '构建成功后发布到 Releases'
-        type: boolean
-        required: false
-        default: true
+  push:
+    branches: [v1.0.79]
+
+env:
+  WSLG_TAG: v1.0.79
+  WESTON_REF: a7e35fdab455dce5774b43b8aff682f748307e31
+  FREERDP_REF: c4030980b29322a9cb2190711a5fadeeeb8b6a33
+  PULSEAUDIO_REF: c33051f2296af748ac5cd13e51abfac4d129e4c7
+  MESA_REF: mesa-23.1.0
+  DIRECTX_REF: v1.608.0
 
 permissions:
   contents: write
@@ -39,31 +43,23 @@ jobs:
           cache: false
 
       - name: 克隆 WSLg 与各组件源码
-        env:
-          WSLG_REF: ${{ inputs.wslg_ref }}
-          WESTON_REF: ${{ inputs.weston_ref }}
         run: |
           set -euo pipefail
-          echo "WSLg ref   : $WSLG_REF"
-          echo "weston ref : $WESTON_REF"
-
-          git clone --branch "$WSLG_REF" --depth 1 https://github.com/microsoft/wslg.git wslg
+          git clone --branch "$WSLG_TAG" --depth 1 https://github.com/microsoft/wslg.git wslg
           cd wslg
 
-          # 组件版本锁定为 WSLg v1.0.79 官方配套版本
-          # 来源：v1.0.79 运行环境的 /mnt/wslg/versions.txt
           # weston 不指定 -b 以保留完整历史：git apply --3way 需要原始 blob 做三方合并
           git clone https://github.com/microsoft/weston-mirror      vendor/weston
           git clone https://github.com/microsoft/FreeRDP-mirror     vendor/FreeRDP
           git clone https://github.com/microsoft/PulseAudio-mirror  vendor/pulseaudio
-          git clone -b v1.608.0    https://github.com/microsoft/DirectX-Headers.git vendor/DirectX-Headers-1.0
-          git clone -b mesa-23.1.0 https://gitlab.freedesktop.org/mesa/mesa.git     vendor/mesa
+          git clone -b "$DIRECTX_REF" https://github.com/microsoft/DirectX-Headers.git vendor/DirectX-Headers-1.0
+          git clone -b "$MESA_REF"    https://gitlab.freedesktop.org/mesa/mesa.git     vendor/mesa
 
           git -C vendor/weston     checkout "$WESTON_REF"
-          git -C vendor/FreeRDP    checkout c4030980b29322a9cb2190711a5fadeeeb8b6a33
-          git -C vendor/pulseaudio checkout c33051f2296af748ac5cd13e51abfac4d129e4c7
+          git -C vendor/FreeRDP    checkout "$FREERDP_REF"
+          git -C vendor/pulseaudio checkout "$PULSEAUDIO_REF"
 
-          echo "=== 实际使用的各组件版本 ==="
+          echo "=== 各组件实际使用的版本 ==="
           for d in weston FreeRDP pulseaudio mesa DirectX-Headers-1.0; do
             printf '%-24s %s\n' "$d" "$(git -C "vendor/$d" rev-parse HEAD)"
           done
@@ -77,8 +73,10 @@ jobs:
           PATCH="$GITHUB_WORKSPACE/repo/patch-files/weston/base-2318feca.patch"
 
           if ! git apply --3way --whitespace=nowarn "$PATCH"; then
-            echo "::error::补丁应用失败，冲突文件："
+            echo "::error::补丁应用失败，冲突文件如下"
             git diff --name-only --diff-filter=U || true
+            echo "--- 冲突片段 ---"
+            git diff | head -120
             exit 1
           fi
           echo "补丁应用成功"
@@ -103,29 +101,32 @@ jobs:
       - name: 上传构建产物
         uses: actions/upload-artifact@v4
         with:
-          name: wslg-system-x64-vhd
+          name: wslg-v1.0.79-system-x64-vhd
           path: |
             wslg/system_x64.vhd
             wslg/SHA256SUMS.txt
           retention-days: 7
 
       - name: 发布到 Releases
-        if: ${{ inputs.publish_release }}
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: wslg-${{ inputs.wslg_ref }}-custom.${{ github.run_number }}
-          name: WSLg ${{ inputs.wslg_ref }} 定制版（白边修复）
+          tag_name: wslg-v1.0.79-custom.${{ github.run_number }}
+          name: WSLg v1.0.79 定制版（白边修复）
           files: |
             wslg/system_x64.vhd
             wslg/SHA256SUMS.txt
           draft: false
           body: |
-            ## WSLg ${{ inputs.wslg_ref }} 定制构建
+            ## WSLg v1.0.79 定制构建
 
             | 项目 | 值 |
             | --- | --- |
-            | WSLg 基线 | `microsoft/wslg` @ `${{ inputs.wslg_ref }}` |
-            | weston 版本 | `${{ inputs.weston_ref }}` |
+            | WSLg 基线 | `microsoft/wslg` @ `v1.0.79` |
+            | weston | `a7e35fdab455dce5774b43b8aff682f748307e31` |
+            | FreeRDP | `c4030980b29322a9cb2190711a5fadeeeb8b6a33` |
+            | pulseaudio | `c33051f2296af748ac5cd13e51abfac4d129e4c7` |
+            | mesa | `mesa-23.1.0` |
+            | DirectX-Headers | `v1.608.0` |
             | 应用补丁 | `patch-files/weston/base-2318feca.patch` |
             | 构建流水线 | run #${{ github.run_number }} |
 
@@ -139,7 +140,7 @@ jobs:
             - 点击左上角标题栏图标切换浅色 / 深色
 
             ### 使用方法
-            1. 下载 `system_x64.vhd` 到本地，例如 `C:\wslg\system_x64.vhd`
+            1. 下载 `system_x64.vhd`，例如放到 `C:\wslg\system_x64.vhd`
             2. 编辑 `%UserProfile%\.wslconfig`，在 `[wsl2]` 节中加一行：
 
                ```ini
