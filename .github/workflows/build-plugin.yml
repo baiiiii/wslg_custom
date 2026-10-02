@@ -17,10 +17,16 @@ jobs:
     steps:
       - name: 克隆 WSLDVCPlugin 源码
         shell: bash
-        run: git clone --branch main --depth 1 https://github.com/baiiiii/wslg.git wslg
+        run: git clone --branch main https://github.com/baiiiii/wslg.git wslg
 
       - name: Setup MSBuild
         uses: microsoft/setup-msbuild@v2
+
+      - name: Generate version resource (UpdateRCVersion)
+        shell: powershell
+        run: |
+          cd wslg\WSLDVCPlugin
+          .\UpdateRCVersion.ps1 -separator "."
 
       - name: MSBuild x64 Release
         shell: cmd
