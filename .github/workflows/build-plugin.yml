@@ -24,7 +24,7 @@ jobs:
 
       - name: MSBuild x64 Release
         shell: cmd
-        run: msbuild WSLDVCPlugin\WSLDVCPlugin.vcxproj /p:Configuration=Release /p:Platform=x64 /m
+        run: msbuild wslg\WSLDVCPlugin\WSLDVCPlugin.vcxproj /p:Configuration=Release /p:Platform=x64 /m
 
       - name: 上传 DLL 工件
         uses: actions/upload-artifact@v4
