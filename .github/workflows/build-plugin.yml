@@ -23,7 +23,7 @@ jobs:
         uses: microsoft/setup-msbuild@v2
 
       - name: Generate version resource (UpdateRCVersion)
-        shell: powershell
+        shell: pwsh
         run: |
           cd wslg\WSLDVCPlugin
           .\UpdateRCVersion.ps1 -separator "."
